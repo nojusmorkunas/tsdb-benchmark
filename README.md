@@ -1,6 +1,9 @@
 # tsdb-benchmark
 
-A self-hosted benchmarking suite for comparing time-series databases on large-scale energy meter data. Supports PostgreSQL, TimescaleDB, ClickHouse, QuestDB and InfluxDB 2 with a browser-based query runner and benchmark dashboard.
+A self-hosted benchmarking suite for comparing time-series databases on large-scale energy meter data. Supports PostgreSQL, TimescaleDB, ClickHouse, QuestDB and InfluxDB 2 with a browser-based query runner and benchmark dashboard. 
+
+## Learn more about the tool
+Read the blog post [here](https://www.morkunas.nl/blog/cape-internship-benchmarking) about why and how this benchmarking tool was built.
 
 ## What's included
 
