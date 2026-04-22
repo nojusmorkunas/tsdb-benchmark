@@ -1,0 +1,29 @@
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: energy
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    deploy:
+      resources:
+        limits:
+          memory: ${MEM_LIMIT:-20G}
+          cpus: '4'
+    shm_size: 1g
+    command: >
+      postgres
+        -c shared_buffers=6144MB
+        -c work_mem=256MB
+        -c effective_cache_size=18GB
+        -c max_parallel_workers_per_gather=2
+    networks:
+      - benchnet
+
+volumes:
+  pg_data:
+
+networks:
+  benchnet:
+    external: true

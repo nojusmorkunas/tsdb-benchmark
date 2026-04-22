@@ -1,0 +1,13 @@
+duckdb>=1.0
+psycopg2-binary
+clickhouse-connect
+influxdb-client
+influxdb3-python
+pyarrow
+pandas
+fastapi
+uvicorn[standard]
+requests
+questdb
+pydantic-settings
+psutil

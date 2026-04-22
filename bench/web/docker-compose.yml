@@ -1,0 +1,46 @@
+services:
+  web:
+    image: bench-web
+    ports:
+      - "8400:8000"
+    volumes:
+      - bench_data:/data
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ../:/bench:ro
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+    environment:
+      PG_HOST: postgres
+      PG_PORT: "5432"
+      PG_PASSWORD: ${POSTGRES_PASSWORD}
+      TS_HOST: timescaledb
+      TS_PORT: "5432"
+      TS_PASSWORD: ${POSTGRES_PASSWORD}
+      CH_HOST: clickhouse
+      CH_PORT: "8123"
+      CH_USER: ${CLICKHOUSE_USER:-default}
+      CH_PASSWORD: ${CLICKHOUSE_PASSWORD}
+      QDB_HOST: questdb
+      QDB_PORT: "8812"
+      QDB_PASSWORD: ${QDB_PASSWORD:-}
+      INFLUX_URL: http://influxdb:8086
+      INFLUX_TOKEN: ${INFLUXDB_TOKEN}
+      INFLUX_ORG: bench
+      INFLUX3_URL: http://influxdb3:8181
+      INFLUX3_DATABASE: energy
+      INFLUX3_TOKEN: ${INFLUXDB3_TOKEN:-}
+      DATA_DIR: /data
+      APP_USER: ${APP_USER:-admin}
+      APP_PASS: ${APP_PASS}
+    networks:
+      - benchnet
+
+volumes:
+  bench_data:
+
+networks:
+  benchnet:
+    name: benchnet
+    driver: bridge

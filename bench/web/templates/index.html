@@ -1,0 +1,773 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DB Benchmark</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#0f1117;color:#e0e0e0;font-size:14px}
+.hdr{padding:14px 24px;background:#161b22;border-bottom:1px solid #30363d;display:flex;align-items:center;justify-content:space-between}
+.hdr h1{font-size:18px}
+.tabs{display:flex;gap:4px}
+.tab{padding:6px 16px;border-radius:6px;cursor:pointer;font-size:13px;color:#8b949e;border:1px solid transparent}
+.tab:hover{color:#c9d1d9}.tab.active{background:#1f6feb;color:#fff}
+.ctr{max-width:1600px;margin:0 auto;padding:16px}
+.pnl{display:none}.pnl.active{display:block}
+.status-bar{display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap}
+.chip{display:flex;align-items:center;gap:6px;padding:5px 11px;background:#161b22;border:1px solid #30363d;border-radius:6px;font-size:12px}
+.dot{width:8px;height:8px;border-radius:50%}.dot.on{background:#56d364}.dot.off{background:#f85149}
+.qbox{background:#161b22;border:1px solid #30363d;border-radius:8px;padding:14px}
+.qbox h3{font-size:12px;color:#8b949e;margin-bottom:6px}
+textarea{width:100%;min-height:110px;background:#0d1117;border:1px solid #30363d;border-radius:6px;color:#c9d1d9;padding:10px;font-family:'SF Mono',monospace;font-size:13px;resize:vertical}
+textarea:focus{outline:none;border-color:#1f6feb}
+select{background:#0d1117;border:1px solid #30363d;color:#c9d1d9;padding:6px 10px;border-radius:6px;font-size:13px;width:100%}
+.btn{padding:7px 18px;border-radius:6px;border:1px solid #30363d;cursor:pointer;font-size:13px;font-weight:500}
+.btn-p{background:#1f6feb;color:#fff;border-color:#1f6feb}.btn-p:hover{background:#388bfd}.btn-p:disabled{opacity:.5;cursor:not-allowed}
+.btn-d{background:#da3633;color:#fff;border-color:#da3633}
+.btn-s{background:#21262d;color:#c9d1d9}.btn-s:hover{background:#30363d}
+.row{display:flex;gap:8px;margin-top:8px;align-items:center;flex-wrap:wrap}
+.rcard{background:#161b22;border:1px solid #30363d;border-radius:8px;overflow:hidden}
+.rh{padding:10px 14px;border-bottom:1px solid #21262d;display:flex;justify-content:space-between;align-items:center}
+.rh .dn{font-weight:600;font-size:14px}
+.tm{font-size:13px;padding:2px 10px;border-radius:12px}
+.tm.f{background:#56d36433;color:#56d364}.tm.m{background:#d2992233;color:#d29922}
+.tm.s{background:#f8514933;color:#f85149}.tm.e{background:#f8514933;color:#f85149}
+.rb{max-height:320px;overflow:auto}
+.rb table{width:100%;border-collapse:collapse;font-size:12px;font-family:monospace}
+.rb th{background:#0d1117;position:sticky;top:0;padding:5px 8px;text-align:left;color:#8b949e;font-weight:500}
+.rb td{padding:3px 8px;border-bottom:1px solid #161b22;white-space:nowrap;max-width:180px;overflow:hidden;text-overflow:ellipsis}
+.rb tr:hover td{background:#1c2129}
+.rerr{padding:12px;color:#f85149;font-family:monospace;font-size:12px;white-space:pre-wrap}
+.ri{padding:6px 14px;font-size:11px;color:#8b949e;border-top:1px solid #21262d}
+.logv{background:#0d1117;border:1px solid #30363d;border-radius:8px;padding:12px;font-family:monospace;font-size:12px;min-height:400px;max-height:600px;overflow:auto;white-space:pre-wrap;line-height:1.6;color:#8b949e}
+.lc{display:flex;gap:8px;margin-bottom:12px;align-items:center;flex-wrap:wrap}
+.ls{font-size:12px;color:#8b949e;margin-left:auto}
+.sp{display:inline-block;width:14px;height:14px;border:2px solid #30363d;border-top-color:#58a6ff;border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.data-info{background:#161b22;border:1px solid #30363d;border-radius:8px;padding:12px 16px;margin-bottom:14px;font-size:13px;color:#8b949e}
+.glay{display:grid;grid-template-columns:300px 1fr;gap:14px}
+.chart-wrap{background:#161b22;border:1px solid #30363d;border-radius:8px;padding:16px;height:440px;position:relative}
+.gnote{font-size:11px;color:#6e7681;margin-top:6px;line-height:1.5}
+.gstat{margin-top:10px;font-size:12px;color:#8b949e;min-height:18px}
+</style></head><body>
+<div class="hdr"><h1>Energy Meter DB Benchmark</h1>
+<div class="tabs">
+<div class="tab active" onclick="sw('bench')">Benchmark</div>
+<div class="tab" onclick="sw('setup')">Setup</div>
+<div class="tab" onclick="sw('logs')">Logs</div>
+<div class="tab" onclick="sw('storage')">Storage</div>
+</div></div>
+<div class="ctr">
+<div class="status-bar" id="sbar"></div>
+
+<!-- BENCHMARK -->
+<div class="pnl active" id="pnl-bench">
+<div style="display:inline-flex;border:1px solid #30363d;border-radius:6px;overflow:hidden;margin-bottom:12px">
+<div id="btab-run" onclick="swb('run')" style="padding:5px 16px;cursor:pointer;font-size:13px;background:#1f6feb;color:#fff">Run</div>
+<div id="btab-results" onclick="swb('results')" style="padding:5px 16px;cursor:pointer;font-size:13px;background:#21262d;color:#8b949e;border-left:1px solid #30363d">Results</div>
+</div>
+<div id="bpnl-run">
+<div style="display:grid;grid-template-columns:280px 1fr;gap:14px">
+<div class="qbox">
+<h3>Database</h3>
+<select id="bdb-sel" style="margin-top:4px"></select>
+<h3 style="margin-top:14px">Runs per query</h3>
+<select id="bruns-sel" style="margin-top:4px">
+<option value="1">1 &mdash; validate only</option>
+<option value="3">3 &mdash; standard</option>
+<option value="5" selected>5 &mdash; thorough</option>
+</select>
+<h3 style="margin-top:14px">Scope</h3>
+<div style="display:flex;gap:12px;margin-top:4px;font-size:12px">
+<label style="cursor:pointer;color:#c9d1d9"><input type="radio" name="bscope" value="full" checked> Full</label>
+<label style="cursor:pointer;color:#c9d1d9"><input type="radio" name="bscope" value="quarter"> Quarter</label>
+</div>
+<div style="display:flex;align-items:center;justify-content:space-between;margin-top:14px;margin-bottom:6px">
+<h3 style="margin:0">Queries</h3>
+<span style="font-size:11px">
+<a href="#" onclick="bqAll(true);return false" style="color:#58a6ff">All</a>
+&nbsp;/&nbsp;
+<a href="#" onclick="bqAll(false);return false" style="color:#58a6ff">None</a>
+</span>
+</div>
+<div style="display:flex;flex-direction:column;gap:2px;font-size:12px">
+<div style="color:#6e7681;font-size:11px;margin-top:4px;margin-bottom:2px">Tier 1 — Point</div>
+<label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" class="bq" data-n="1" checked> #1 Single meter: 1-day hourly</label>
+<label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" class="bq" data-n="2" checked> #2 Single meter: 1-month daily</label>
+<label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" class="bq" data-n="3" checked> #3 Single meter: 1-year monthly</label>
+<div style="color:#6e7681;font-size:11px;margin-top:6px;margin-bottom:2px">Tier 2 — Range</div>
+<label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" class="bq" data-n="4" checked> #4 Monthly E17 vs E18 balance</label>
+<label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" class="bq" data-n="5" checked> #5 Hourly agg (first 3 months)</label>
+<label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" class="bq" data-n="6" checked> #6 Peak consumption hours</label>
+<label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" class="bq" data-n="7" checked> #7 Daily agg by direction</label>
+<div style="color:#6e7681;font-size:11px;margin-top:6px;margin-bottom:2px">Tier 3 — Full scan</div>
+<label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" class="bq" data-n="8" checked> #8 Top 20 meters by consumption</label>
+<label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" class="bq" data-n="9" checked> #9 Net energy balance per meter</label>
+<label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" class="bq" data-n="10" checked> #10 Prosumer detection (ratio)</label>
+<label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" class="bq" data-n="11" checked> #11 Active meters per day</label>
+<div style="color:#6e7681;font-size:11px;margin-top:6px;margin-bottom:2px">Tier 4 — Join</div>
+<label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" class="bq" data-n="12" checked> #12 Hierarchy: supplier total daily</label>
+<label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" class="bq" data-n="13" checked> #13 Hierarchy: by category daily</label>
+<label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" class="bq" data-n="14" checked> #14 Hierarchy: sub-category monthly</label>
+<div style="color:#6e7681;font-size:11px;margin-top:6px;margin-bottom:2px">Tier 5 — Join, no time window</div>
+<label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" class="bq" data-n="15" checked> #15 Hierarchy: supplier total (all time)</label>
+<label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" class="bq" data-n="16" checked> #16 Hierarchy: by category all time</label>
+<label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" class="bq" data-n="17" checked> #17 Hierarchy: sub-category all time</label>
+</div>
+<div class="row" style="margin-top:16px">
+<button class="btn btn-p" id="bbtn" onclick="startBench()">Run Benchmark</button>
+<button class="btn btn-d" onclick="ss()">Stop</button>
+</div>
+</div>
+<div>
+<div class="lc"><span style="font-size:12px;font-weight:600;color:#c9d1d9">Output</span><span class="ls" id="blstat">Idle</span><button class="btn btn-s" style="margin-left:auto;padding:2px 10px;font-size:11px" onclick="navigator.clipboard.writeText(document.getElementById('blogv').textContent)">Copy</button></div>
+<div class="logv" id="blogv">No output yet.</div>
+</div>
+</div>
+</div>
+<div id="bpnl-results" style="display:none">
+<div style="display:flex;gap:8px;margin-bottom:10px;align-items:center;flex-wrap:wrap">
+<button class="btn btn-s" onclick="loadResults()">Refresh</button>
+<!-- n_runs switcher -->
+<div style="display:flex;border:1px solid #30363d;border-radius:6px;overflow:hidden;font-size:13px">
+  <button id="rnruns-1" onclick="setNRuns(1)" style="padding:4px 14px;cursor:pointer;background:#21262d;color:#8b949e;border:none">1×</button>
+  <button id="rnruns-3" onclick="setNRuns(3)" style="padding:4px 14px;cursor:pointer;background:#1f6feb;color:#fff;border:none;border-left:1px solid #30363d">3×</button>
+  <button id="rnruns-5" onclick="setNRuns(5)" style="padding:4px 14px;cursor:pointer;background:#21262d;color:#8b949e;border:none;border-left:1px solid #30363d">5×</button>
+</div>
+<!-- scope switcher (filters history display only) -->
+<div style="display:flex;border:1px solid #30363d;border-radius:6px;overflow:hidden;font-size:13px">
+  <button id="rscope-full" onclick="setRScope('full')" style="padding:4px 14px;cursor:pointer;background:#1f6feb;color:#fff;border:none">Full dataset</button>
+  <button id="rscope-quarter" onclick="setRScope('quarter')" style="padding:4px 14px;cursor:pointer;background:#21262d;color:#8b949e;border:none;border-left:1px solid #30363d">Quarter</button>
+</div>
+<div style="display:flex;border:1px solid #30363d;border-radius:6px;overflow:hidden;font-size:13px">
+  <button id="rview-table" onclick="setRView('table')" style="padding:4px 14px;cursor:pointer;background:#1f6feb;color:#fff;border:none">Table</button>
+  <button id="rview-chart" onclick="setRView('chart')" style="padding:4px 14px;cursor:pointer;background:#21262d;color:#8b949e;border:none;border-left:1px solid #30363d">Chart</button>
+  <button id="rview-text" onclick="setRView('text')" style="padding:4px 14px;cursor:pointer;background:#21262d;color:#8b949e;border:none;border-left:1px solid #30363d">Text</button>
+</div>
+<!-- fill gaps toggle -->
+<div style="display:flex;border:1px solid #30363d;border-radius:6px;overflow:hidden;font-size:13px">
+  <button id="rfillgaps-off" onclick="setFillGaps(false)" style="padding:4px 14px;cursor:pointer;background:#1f6feb;color:#fff;border:none">Exact</button>
+  <button id="rfillgaps-on" onclick="setFillGaps(true)" style="padding:4px 14px;cursor:pointer;background:#21262d;color:#8b949e;border:none;border-left:1px solid #30363d">Fill gaps</button>
+</div>
+<!-- cold/best switcher -->
+<div style="display:flex;border:1px solid #30363d;border-radius:6px;overflow:hidden;font-size:13px">
+  <button id="rmode-best" onclick="setColdMode(false)" style="padding:4px 14px;cursor:pointer;background:#1f6feb;color:#fff;border:none">Best</button>
+  <button id="rmode-cold" onclick="setColdMode(true)" style="padding:4px 14px;cursor:pointer;background:#21262d;color:#8b949e;border:none;border-left:1px solid #30363d">Cold (1st run)</button>
+</div>
+<button class="btn btn-s" onclick="copyResultsText()" title="Copy as plain text">Copy text</button>
+<button class="btn btn-s" onclick="exportBenchResults()" title="Download benchmark_results.json">Export JSON</button>
+</div>
+<!-- column/query controls -->
+<div id="rcol-controls" style="background:#161b22;border:1px solid #30363d;border-radius:6px;padding:10px 14px;margin-bottom:10px;font-size:12px">
+  <div style="display:flex;gap:24px;flex-wrap:wrap">
+    <div>
+      <div style="color:#8b949e;margin-bottom:6px;font-weight:600">Databases (drag to reorder)</div>
+      <div id="rcol-db-list" style="display:flex;gap:6px;flex-wrap:wrap"></div>
+    </div>
+    <div>
+      <div style="color:#8b949e;margin-bottom:6px;font-weight:600">Queries</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+        <a href="#" onclick="rqAll(true);return false" style="color:#58a6ff;font-size:11px">All</a>
+        <a href="#" onclick="rqAll(false);return false" style="color:#58a6ff;font-size:11px">None</a>
+        <div id="rcol-q-list" style="display:flex;gap:6px;flex-wrap:wrap"></div>
+      </div>
+    </div>
+  </div>
+</div>
+<style>.cell-wrap{position:relative;display:inline-block}.cell-wrap .del-btn{display:none;position:absolute;top:-6px;right:-8px;background:#da3633;color:#fff;border:none;border-radius:50%;width:14px;height:14px;font-size:9px;line-height:14px;text-align:center;cursor:pointer;padding:0}.cell-wrap:hover .del-btn{display:block}</style>
+<div id="bres"><span style="color:#8b949e">No results yet. Run a benchmark first.</span></div>
+<div id="bres-chart" style="display:none;background:#161b22;border:1px solid #30363d;border-radius:8px;padding:16px;margin-top:8px">
+  <canvas id="breschart" style="max-height:480px"></canvas>
+</div>
+<div id="bres-text" style="display:none;background:#0d1117;border:1px solid #30363d;border-radius:6px;padding:12px;margin-top:8px;font-family:monospace;font-size:12px;white-space:pre;overflow-x:auto;color:#c9d1d9"></div>
+</div>
+</div>
+
+<!-- SETUP -->
+<div class="pnl" id="pnl-setup">
+<div class="qbox" style="margin-bottom:14px">
+<h3>Step 1: Upload seed file</h3>
+<p style="font-size:13px;color:#8b949e;margin-bottom:8px">Copy your <code>transformedData.parquet</code> into the <code>shared_data</code> Docker volume as <code>seed.parquet</code>:</p>
+<pre style="background:#0d1117;padding:10px;border-radius:6px;font-size:12px;overflow-x:auto">docker cp transformedData.parquet $(docker ps -qf name=web):/data/seed.parquet</pre>
+</div>
+<div class="qbox" style="margin-bottom:14px">
+<h3>Step 2: Generate 2-year dataset</h3>
+<p style="font-size:13px;color:#8b949e;margin-bottom:8px">Replicates the 15-day seed 48 times (~1.4B rows). Takes 45-90 min on N100.</p>
+<button class="btn btn-p" onclick="rs('generate_data.py')">Generate Data</button>
+</div>
+<div class="qbox" style="margin-bottom:14px">
+<h3>Step 3: Load into databases</h3>
+<p style="font-size:13px;color:#8b949e;margin-bottom:8px">Loads data into all databases. Takes 4-8 hours on N100.</p>
+<div class="row">
+<button class="btn btn-p" onclick="rs('load_all.py')">Load All</button>
+<button class="btn btn-s" onclick="rs('load_all.py',['--only','postgres'])">PG only</button>
+<button class="btn btn-s" onclick="rs('load_all.py',['--only','timescaledb'])">TS only</button>
+<button class="btn btn-s" onclick="rs('load_all.py',['--only','clickhouse'])">CH only</button>
+<button class="btn btn-s" onclick="rs('load_all.py',['--only','questdb'])">QDB only</button>
+<button class="btn btn-s" onclick="rs('load_all.py',['--only','influxdb'])">Influx2 only</button>
+<button class="btn btn-s" onclick="rs('load_all.py',['--only','influxdb3'])">Influx3 only</button>
+</div></div>
+<div class="qbox" style="margin-bottom:14px">
+<h3>Step 3b: Generate &amp; load hierarchy</h3>
+<p style="font-size:13px;color:#8b949e;margin-bottom:8px">Creates a synthetic EAN\u2192supplier/category/sub-category mapping table. Run once after data is loaded.</p>
+<div class="row">
+<button class="btn btn-s" onclick="rs('generate_hierarchy.py')">Generate Hierarchy</button>
+<button class="btn btn-s" onclick="rs('load_all.py',['--only','hierarchy'])">Load All DBs</button>
+<button class="btn btn-s" onclick="rs('load_all.py',['--only','hierarchy-postgres'])">PG only</button>
+<button class="btn btn-s" onclick="rs('load_all.py',['--only','hierarchy-timescaledb'])">TS only</button>
+<button class="btn btn-s" onclick="rs('load_all.py',['--only','hierarchy-clickhouse'])">CH only</button>
+<button class="btn btn-s" onclick="rs('load_all.py',['--only','hierarchy-questdb'])">QDB only</button>
+<button class="btn btn-s" onclick="rs('load_all.py',['--only','hierarchy-influxdb3'])">Influx3 only</button>
+<button class="btn btn-s" onclick="rs('load_all.py',['--only','hierarchy-influxdb2'])">Influx2 only</button>
+</div></div>
+<div class="qbox">
+<h3>Step 4: Run benchmark</h3>
+<p style="font-size:13px;color:#8b949e;margin-bottom:8px">Use the Benchmark tab to run queries against one database at a time and compare results.</p>
+<button class="btn btn-s" onclick="sw('bench')">Go to Benchmark</button>
+</div></div>
+
+<!-- LOGS -->
+<div class="pnl" id="pnl-logs">
+<div class="lc">
+<button class="btn btn-d" onclick="ss()">Stop Script</button>
+<button class="btn btn-s" onclick="rl()">Refresh</button>
+<button class="btn btn-s" onclick="navigator.clipboard.writeText(document.getElementById('logv').textContent)">Copy</button>
+<div class="ls" id="lstat"></div>
+</div>
+<div class="logv" id="logv">No logs yet. Run a script from the Setup tab.</div>
+</div>
+
+<!-- STORAGE -->
+<div class="pnl" id="pnl-storage">
+<div style="overflow-x:auto">
+<table style="width:100%;border-collapse:collapse;font-size:13px">
+<thead>
+<tr style="background:#0d1117">
+  <th style="padding:8px 12px;text-align:left;color:#8b949e;font-weight:500;border-bottom:1px solid #30363d">Database</th>
+  <th style="padding:8px 12px;text-align:right;color:#8b949e;font-weight:500;border-bottom:1px solid #30363d">Disk Usage</th>
+  <th style="padding:8px 12px;text-align:right;color:#8b949e;font-weight:500;border-bottom:1px solid #30363d">vs PostgreSQL</th>
+  <th style="padding:8px 12px;text-align:left;color:#8b949e;font-weight:500;border-bottom:1px solid #30363d">Storage Format</th>
+</tr>
+</thead>
+<tbody>
+<tr style="border-top:1px solid #21262d">
+  <td style="padding:5px 12px;color:#c9d1d9">PostgreSQL</td>
+  <td style="padding:5px 12px;text-align:right;font-family:monospace;background:#2b1a0a;color:#c9d1d9">174 GB</td>
+  <td style="padding:5px 12px;text-align:right;font-family:monospace;color:#6e7681">baseline</td>
+  <td style="padding:5px 12px;color:#8b949e">Uncompressed row store + indexes</td>
+</tr>
+<tr style="border-top:1px solid #21262d">
+  <td style="padding:5px 12px;color:#c9d1d9">QuestDB</td>
+  <td style="padding:5px 12px;text-align:right;font-family:monospace;color:#c9d1d9">32 GB</td>
+  <td style="padding:5px 12px;text-align:right;font-family:monospace;color:#d29922">5× smaller</td>
+  <td style="padding:5px 12px;color:#8b949e">Columnar, append-optimised, daily partitions</td>
+</tr>
+<tr style="border-top:1px solid #21262d">
+  <td style="padding:5px 12px;color:#c9d1d9">ClickHouse</td>
+  <td style="padding:5px 12px;text-align:right;font-family:monospace;color:#c9d1d9">13 GB</td>
+  <td style="padding:5px 12px;text-align:right;font-family:monospace;color:#d29922">13× smaller</td>
+  <td style="padding:5px 12px;color:#8b949e">Columnar MergeTree, LZ4 compression</td>
+</tr>
+<tr style="border-top:1px solid #21262d">
+  <td style="padding:5px 12px;color:#c9d1d9">TimescaleDB</td>
+  <td style="padding:5px 12px;text-align:right;font-family:monospace;color:#c9d1d9">8 GB</td>
+  <td style="padding:5px 12px;text-align:right;font-family:monospace;color:#56d364">21× smaller</td>
+  <td style="padding:5px 12px;color:#8b949e">Hypertable chunks, compress_segmentby(ean)</td>
+</tr>
+<tr style="border-top:1px solid #21262d">
+  <td style="padding:5px 12px;color:#c9d1d9">InfluxDB 2</td>
+  <td style="padding:5px 12px;text-align:right;font-family:monospace;background:#0d2b0d;color:#c9d1d9">5.5 GB</td>
+  <td style="padding:5px 12px;text-align:right;font-family:monospace;color:#56d364">31× smaller</td>
+  <td style="padding:5px 12px;color:#8b949e">TSM (Time Structured Merge), tag compression</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p style="font-size:11px;color:#6e7681;margin-top:10px">All databases hold the identical ~1.4B row dataset. Sizes measured from Docker volumes on disk.</p>
+</div>
+
+</div>
+
+<script>
+const DBN=["PostgreSQL","TimescaleDB","ClickHouse","QuestDB","InfluxDB 2","InfluxDB 3"];
+const DBC={"PostgreSQL":"#336791","TimescaleDB":"#fdb515","ClickHouse":"#ffcc00","QuestDB":"#3c8dff","InfluxDB 2":"#9b59b6","InfluxDB 3":"#e24d42"};
+// ---- Benchmark ----
+const BQ_ORDER=[
+  "Single meter: 1 day hourly","Single meter: 1 month daily","Single meter: 1 year monthly",
+  "Monthly E17 vs E18 balance","Hourly aggregation (first 3 months)","Peak consumption hours","Daily aggregation by direction",
+  "Total consumption per meter (top 20)","Net energy balance per meter","Prosumer detection (ratio)","Active meters per day",
+  "Hierarchy: supplier total daily","Hierarchy: by category (PRF/SMA) daily","Hierarchy: sub-category monthly (PRF only)",
+  "Hierarchy: supplier total (all time)","Hierarchy: by category all time (PRF/SMA)","Hierarchy: sub-category all time (PRF only)",
+];
+const BQ_TIER={"Single meter: 1 day hourly":1,"Single meter: 1 month daily":1,"Single meter: 1 year monthly":1,
+  "Monthly E17 vs E18 balance":2,"Hourly aggregation (first 3 months)":2,"Peak consumption hours":2,"Daily aggregation by direction":2,
+  "Total consumption per meter (top 20)":3,"Net energy balance per meter":3,"Prosumer detection (ratio)":3,"Active meters per day":3,
+  "Hierarchy: supplier total daily":4,"Hierarchy: by category (PRF/SMA) daily":4,"Hierarchy: sub-category monthly (PRF only)":4,
+  "Hierarchy: supplier total (all time)":5,"Hierarchy: by category all time (PRF/SMA)":5,"Hierarchy: sub-category all time (PRF only)":5};
+const BQ_TIER_LABEL={1:"Point Queries",2:"Range Aggregations",3:"Full Scan Aggregations",4:"Join Queries",5:"Join Queries, No Time Window"};
+// Short labels for display
+const BQ_SHORT={
+  "Single meter: 1 day hourly":"#1 1-day hourly","Single meter: 1 month daily":"#2 1-month daily",
+  "Single meter: 1 year monthly":"#3 1-year monthly","Monthly E17 vs E18 balance":"#4 Monthly balance",
+  "Hourly aggregation (first 3 months)":"#5 Hourly agg","Peak consumption hours":"#6 Peak hours",
+  "Daily aggregation by direction":"#7 Daily dir","Total consumption per meter (top 20)":"#8 Top 20",
+  "Net energy balance per meter":"#9 Net balance","Prosumer detection (ratio)":"#10 Prosumer",
+  "Active meters per day":"#11 Active/day","Hierarchy: supplier total daily":"#12 Supplier",
+  "Hierarchy: by category (PRF/SMA) daily":"#13 Category","Hierarchy: sub-category monthly (PRF only)":"#14 Sub-cat",
+  "Hierarchy: supplier total (all time)":"#15 Supplier all","Hierarchy: by category all time (PRF/SMA)":"#16 Category all","Hierarchy: sub-category all time (PRF only)":"#17 Sub-cat all",
+};
+
+let _rView='table';           // 'table' | 'chart' | 'text'
+let _rDbOrder=[];             // current column order (DB names)
+let _rDbVisible={};           // db -> bool
+let _rQVisible={};            // preset -> bool
+let _rData=null;              // last loaded data
+let _bResChart=null;          // Chart.js instance for results chart
+let _dragSrc=null;
+let _nRuns=5;                 // active n_runs for best table (1|3|5)
+let _coldMode=false;          // false=best(min), true=cold(first run)
+let _fillGaps=false;          // fill missing cells from lower n_runs
+
+function setFillGaps(on){
+  _fillGaps=on;
+  document.getElementById('rfillgaps-off').style.background=on?'#21262d':'#1f6feb';
+  document.getElementById('rfillgaps-off').style.color=on?'#8b949e':'#fff';
+  document.getElementById('rfillgaps-on').style.background=on?'#1f6feb':'#21262d';
+  document.getElementById('rfillgaps-on').style.color=on?'#fff':'#8b949e';
+  if(_rData)renderResults(_rData,_rScope);
+}
+
+function setColdMode(cold){
+  _coldMode=cold;
+  document.getElementById('rmode-best').style.background=cold?'#21262d':'#1f6feb';
+  document.getElementById('rmode-best').style.color=cold?'#8b949e':'#fff';
+  document.getElementById('rmode-cold').style.background=cold?'#1f6feb':'#21262d';
+  document.getElementById('rmode-cold').style.color=cold?'#fff':'#8b949e';
+  if(_rData)renderResults(_rData,_rScope);
+}
+
+function setNRuns(n){
+  _nRuns=n;
+  [1,3,5].forEach(v=>{
+    const el=document.getElementById('rnruns-'+v);
+    el.style.background=v===n?'#1f6feb':'#21262d';
+    el.style.color=v===n?'#fff':'#8b949e';
+  });
+  if(_rData)renderResults(_rData,_rScope);
+}
+
+function setRView(v){
+  _rView=v;
+  const btns=['table','chart','text'];
+  btns.forEach(b=>{
+    const el=document.getElementById('rview-'+b);
+    el.style.background=b===v?'#1f6feb':'#21262d';
+    el.style.color=b===v?'#fff':'#8b949e';
+  });
+  document.getElementById('bres').style.display=v==='table'?'':'none';
+  document.getElementById('bres-chart').style.display=v==='chart'?'':'none';
+  document.getElementById('bres-text').style.display=v==='text'?'':'none';
+  if(_rData)renderResults(_rData,_rScope);
+}
+
+function _buildDbControls(dbs){
+  // Merge: keep existing order/visibility, add new DBs at end
+  const seen=new Set(_rDbOrder);
+  for(const db of dbs){if(!seen.has(db)){_rDbOrder.push(db);_rDbVisible[db]=true;seen.add(db);}}
+  // Remove DBs no longer in data
+  _rDbOrder=_rDbOrder.filter(db=>dbs.includes(db));
+
+  const list=document.getElementById('rcol-db-list');
+  list.innerHTML='';
+  for(const db of _rDbOrder){
+    const pill=document.createElement('div');
+    pill.dataset.db=db;
+    pill.draggable=true;
+    pill.style.cssText=`display:flex;align-items:center;gap:4px;padding:3px 8px;border-radius:4px;border:1px solid #30363d;cursor:grab;user-select:none;background:${_rDbVisible[db]?'#21262d':'#0d1117'};color:${_rDbVisible[db]?(DBC[db]||'#c9d1d9'):'#6e7681'}`;
+    pill.innerHTML=`<input type="checkbox" ${_rDbVisible[db]?'checked':''} style="cursor:pointer" onchange="toggleDb('${db}',this.checked)"> <span>${db}</span>`;
+    pill.addEventListener('dragstart',e=>{_dragSrc=db;e.dataTransfer.effectAllowed='move';});
+    pill.addEventListener('dragover',e=>{e.preventDefault();e.dataTransfer.dropEffect='move';});
+    pill.addEventListener('drop',e=>{
+      e.preventDefault();
+      if(_dragSrc&&_dragSrc!==db){
+        const fi=_rDbOrder.indexOf(_dragSrc),ti=_rDbOrder.indexOf(db);
+        _rDbOrder.splice(fi,1);_rDbOrder.splice(ti,0,_dragSrc);
+        _buildDbControls(dbs);
+        if(_rData)renderResults(_rData,_rScope);
+      }
+    });
+    list.appendChild(pill);
+  }
+}
+
+function _buildQControls(){
+  if(Object.keys(_rQVisible).length===0)BQ_ORDER.forEach(q=>_rQVisible[q]=true);
+  const list=document.getElementById('rcol-q-list');
+  list.innerHTML='';
+  for(const q of BQ_ORDER){
+    const lbl=document.createElement('label');
+    lbl.style.cssText='display:flex;align-items:center;gap:3px;cursor:pointer;padding:2px 6px;border-radius:4px;border:1px solid #30363d;font-size:11px;color:#c9d1d9';
+    lbl.innerHTML=`<input type="checkbox" ${_rQVisible[q]?'checked':''} onchange="toggleQ('${q.replace(/'/g,"\\'")}',this.checked)"> ${BQ_SHORT[q]||q}`;
+    list.appendChild(lbl);
+  }
+}
+
+function toggleDb(db,checked){_rDbVisible[db]=checked;if(_rData)renderResults(_rData,_rScope);}
+function toggleQ(q,checked){_rQVisible[q]=checked;if(_rData)renderResults(_rData,_rScope);}
+function rqAll(v){BQ_ORDER.forEach(q=>_rQVisible[q]=v);_buildQControls();if(_rData)renderResults(_rData,_rScope);}
+
+function copyResultsText(){
+  const el=document.getElementById('bres-text');
+  if(el.textContent.trim()){navigator.clipboard.writeText(el.textContent);}
+  else{
+    if(_rData){const txt=buildTextTable(_rData);navigator.clipboard.writeText(txt);}
+  }
+}
+
+async function deleteBestCell(n_runs,database,preset){
+  if(!confirm(`Remove best result for ${database} / ${preset} (×${n_runs})?`))return;
+  const r=await fetch('/api/benchmark-results/best',{method:'DELETE',headers:{'Content-Type':'application/json'},body:JSON.stringify({n_runs,database,preset})});
+  const d=await r.json();
+  if(d.error){alert('Error: '+d.error);return;}
+  await loadResults();
+}
+
+async function deleteHistoryRun(run_id,database){
+  if(!confirm(`Delete run ${run_id.substring(0,16)} for ${database}?`))return;
+  const r=await fetch('/api/benchmark-results/history',{method:'DELETE',headers:{'Content-Type':'application/json'},body:JSON.stringify({run_id,database})});
+  const d=await r.json();
+  if(d.error){alert(d.error);return;}
+  rlb();
+}
+async function promoteToBest(n_runs,run_id,preset){
+  const r=await fetch('/api/benchmark-results/best',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({n_runs,run_id,preset})});
+  const d=await r.json();
+  if(d.error){alert('Error: '+d.error);return;}
+  await loadResults();
+}
+
+function swb(mode){
+  const aS='padding:5px 16px;cursor:pointer;font-size:13px;background:#1f6feb;color:#fff';
+  const iS='padding:5px 16px;cursor:pointer;font-size:13px;background:#21262d;color:#8b949e;border-left:1px solid #30363d';
+  document.getElementById('btab-run').style.cssText=mode==='run'?aS:iS;
+  document.getElementById('btab-results').style.cssText=mode==='results'?aS:iS;
+  document.getElementById('bpnl-run').style.display=mode==='run'?'':'none';
+  document.getElementById('bpnl-results').style.display=mode==='results'?'':'none';
+  if(mode==='results')loadResults();
+}
+
+function bqAll(checked){document.querySelectorAll('.bq').forEach(c=>c.checked=checked);}
+
+async function startBench(){
+  const db=document.getElementById('bdb-sel').value;
+  const runs=document.getElementById('bruns-sel').value;
+  const skip=[...document.querySelectorAll('.bq:not(:checked)')].map(c=>c.dataset.n).join(',');
+  const scope=document.querySelector('input[name="bscope"]:checked').value;
+  const args=['--database',db,'--runs',runs];
+  if(skip)args.push('--skip',skip);
+  if(scope==='quarter')args.push('--scope','quarter');
+  const btn=document.getElementById('bbtn');
+  btn.disabled=true;btn.innerHTML='<span class="sp"></span> Running...';
+  try{
+    await fetch('/api/run-script',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({script:'benchmark.py',args})});
+    const iv=setInterval(async()=>{
+      await rlb();
+      const r=await fetch('/api/logs');const d=await r.json();
+      if(!d.running){clearInterval(iv);rlb();btn.disabled=false;btn.textContent='Run Benchmark';}
+    },2000);
+  }catch(e){
+    btn.disabled=false;btn.textContent='Run Benchmark';
+    document.getElementById('blogv').textContent='Error: '+e.message;
+  }
+}
+
+async function rlb(){
+  try{
+    const r=await fetch('/api/logs');const d=await r.json();
+    const v=document.getElementById('blogv');
+    v.textContent=d.logs||'No output yet.';v.scrollTop=v.scrollHeight;
+    document.getElementById('blstat').innerHTML=d.running?'<span class="sp"></span> Running...':'Idle';
+  }catch(e){}
+}
+
+let _rScope='full';
+function setRScope(s){
+  _rScope=s;
+  document.getElementById('rscope-full').style.cssText='padding:4px 14px;cursor:pointer;border:none;'+(s==='full'?'background:#1f6feb;color:#fff':'background:#21262d;color:#8b949e;border-right:1px solid #30363d');
+  document.getElementById('rscope-quarter').style.cssText='padding:4px 14px;cursor:pointer;border:none;border-left:1px solid #30363d;'+(s==='quarter'?'background:#1f6feb;color:#fff':'background:#21262d;color:#8b949e');
+  if(_rData)_renderHistory(_rData);  // history filters by scope; best table is scope-independent
+}
+
+async function loadResults(){
+  try{
+    const r=await fetch('/api/benchmark-results');
+    const d=await r.json();
+    renderResults(d,_rScope);
+  }catch(e){document.getElementById('bres').innerHTML=`<span style="color:#f85149">${e.message}</span>`;}
+}
+
+async function exportBenchResults(){
+  try{
+    const r=await fetch('/api/benchmark-results');
+    const d=await r.json();
+    const blob=new Blob([JSON.stringify(d,null,2)],{type:'application/json'});
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(blob);
+    a.download='benchmark_results.json';
+    a.click();
+  }catch(e){alert('Export failed: '+e.message);}
+}
+
+
+
+function fmtMs(ms){
+  if(ms==null)return'—';
+  return ms>=1000?`${(ms/1000).toFixed(2)}s`:`${ms.toFixed(0)}ms`;
+}
+
+function _bestForNRuns(data){
+  // Returns {db: {preset: cell}} for the active _nRuns
+  // If _fillGaps, missing cells are filled from lower n_runs (cell gets _fallback=true)
+  const key=String(_nRuns);
+  const primary=(data.best&&data.best[key])||{};
+  if(!_fillGaps)return primary;
+  const fallbackKeys=[1,3,5].filter(n=>n!==_nRuns).map(String);
+  const result={};
+  const allDbs=new Set([...Object.keys(primary),...fallbackKeys.flatMap(k=>Object.keys((data.best&&data.best[k])||{}))]);
+  for(const db of allDbs){
+    result[db]={...primary[db]};
+    for(const fk of fallbackKeys){
+      const fb=(data.best&&data.best[fk]&&data.best[fk][db])||{};
+      for(const [preset,cell] of Object.entries(fb)){
+        if(!result[db][preset]&&cell){result[db][preset]={...cell,_fallback:fk};}
+      }
+    }
+  }
+  return result;
+}
+
+function renderResults(data,scope='full'){
+  _rData=data;
+  const bestMap=_bestForNRuns(data);
+  const allDbs=Object.keys(bestMap);
+  // Also include DBs present in history for the control list
+  const historyDbs=[...new Set((data.history||data.runs||[]).map(r=>r.database))];
+  const allKnownDbs=[...new Set([...allDbs,...historyDbs])];
+  if(!allKnownDbs.length){
+    document.getElementById('bres').innerHTML='<span style="color:#8b949e">No results yet. Run a benchmark first.</span>';
+    return;
+  }
+  _buildDbControls(allKnownDbs);
+  _buildQControls();
+
+  const dbs=_rDbOrder.filter(db=>_rDbVisible[db]);
+  const queries=BQ_ORDER.filter(q=>_rQVisible[q]);
+
+  if(_rView==='table')_renderTable(bestMap,dbs,queries);
+  else if(_rView==='chart')_renderChart(bestMap,dbs,queries);
+  else _renderText(bestMap,dbs,queries);
+
+  _renderHistory(data);
+}
+
+function _renderTable(bestMap,dbs,queries){
+  let h='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px">';
+  h+='<thead><tr style="background:#0d1117">';
+  h+='<th style="text-align:left;padding:8px 12px;color:#8b949e;min-width:230px">Query</th>';
+  for(const db of dbs){
+    h+=`<th style="padding:8px 10px;text-align:right;color:${DBC[db]||'#c9d1d9'}">${db}<br><span style="font-weight:400;font-size:11px;color:#6e7681">${_coldMode?'':'best ×'+_nRuns}</span></th>`;
+  }
+  h+='</tr></thead><tbody>';
+  let lastTier=0;
+  for(const preset of queries){
+    const tier=BQ_TIER[preset]||0;
+    if(tier!==lastTier){
+      h+=`<tr><td colspan="${dbs.length+1}" style="padding:10px 12px 4px;font-size:11px;font-weight:600;color:#6e7681;text-transform:uppercase;letter-spacing:0.5px;background:#0d1117">Tier ${tier} — ${BQ_TIER_LABEL[tier]||''}</td></tr>`;
+      lastTier=tier;
+    }
+    const vals=dbs.map(db=>{const cell=bestMap[db]?.[preset];if(!cell)return null;const ms=_coldMode?(cell.times_ms&&cell.times_ms[0]!=null?cell.times_ms[0]:null):cell.min_ms;return ms!=null?ms:null;}).filter(v=>v!=null);
+    const best=vals.length?Math.min(...vals):null;
+    const worst=vals.length>1?Math.max(...vals):null;
+    h+=`<tr style="border-top:1px solid #21262d">`;
+    h+=`<td style="padding:5px 12px;color:#c9d1d9">${preset}</td>`;
+    for(const db of dbs){
+      const cell=bestMap[db]?.[preset];
+      let inner='<span style="color:#6e7681">—</span>';let bg='';
+      const ms=cell?(_coldMode?(cell.times_ms&&cell.times_ms[0]!=null?cell.times_ms[0]:null):cell.min_ms):null;
+      if(cell&&ms!=null){
+        const tip=(cell.times_ms||[]).map(t=>fmtMs(t)).join(', ')+` | ${cell.rows} rows | run: ${(cell.run_id||'').substring(0,16)}`;
+        if(best!=null&&ms===best&&vals.length>1)bg='background:#0d2b0d;';
+        else if(worst!=null&&ms===worst&&vals.length>1)bg='background:#2b1a0a;';
+        const presetEsc=preset.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+        const dbEsc=db.replace(/'/g,"\\'");
+        inner=`<span class="cell-wrap"><span title="${tip}">${fmtMs(ms)}</span><button class="del-btn" onclick="deleteBestCell(${_nRuns},'${dbEsc}','${presetEsc}')" title="Remove from best">×</button></span>`;
+      }
+      h+=`<td style="padding:5px 10px;text-align:right;font-family:monospace;${bg}">${inner}</td>`;
+    }
+    h+='</tr>';
+  }
+  h+='</tbody></table></div>';
+  document.getElementById('bres').innerHTML=h;
+}
+
+function _renderChart(bestMap,dbs,queries){
+  const labels=queries.map(q=>BQ_SHORT[q]||q);
+  const datasets=dbs.map(db=>({
+    label:db,
+    data:queries.map(q=>{const cell=bestMap[db]?.[q];if(!cell)return null;const ms=_coldMode?(cell.times_ms&&cell.times_ms[0]!=null?cell.times_ms[0]:null):cell.min_ms;return ms!=null?+(ms/1000).toFixed(3):null;}),
+    backgroundColor:(DBC[db]||'#c9d1d9')+'99',
+    borderColor:DBC[db]||'#c9d1d9',
+    borderWidth:1,
+  }));
+  if(_bResChart){_bResChart.destroy();_bResChart=null;}
+  const ctx=document.getElementById('breschart').getContext('2d');
+  _bResChart=new Chart(ctx,{type:'bar',data:{labels,datasets},options:{
+    responsive:true,indexAxis:'y',
+    plugins:{legend:{labels:{color:'#c9d1d9'}},tooltip:{callbacks:{label:c=>c.raw!=null?`${c.dataset.label}: ${c.raw}s`:'N/A'}}},
+    scales:{
+      x:{type:'logarithmic',title:{display:true,text:'Time (s, log scale)',color:'#8b949e'},ticks:{color:'#8b949e'},grid:{color:'#21262d'}},
+      y:{ticks:{color:'#c9d1d9',font:{size:11}},grid:{color:'#21262d'}},
+    },
+  }});
+  document.getElementById('bres').innerHTML='';
+}
+
+function buildTextTable(data){
+  const bestMap=_bestForNRuns(data);
+  const dbs=_rDbOrder.filter(db=>_rDbVisible[db]!==false);
+  const queries=BQ_ORDER.filter(q=>_rQVisible[q]!==false);
+  return _buildTextStr(bestMap,dbs,queries);
+}
+
+function _buildTextStr(bestMap,dbs,queries){
+  const COL=18;
+  const qCol=32;
+  let lines=[];
+  const header='Query'.padEnd(qCol)+dbs.map(db=>db.padStart(COL)).join('');
+  lines.push(header);
+  lines.push('-'.repeat(header.length));
+  let lastTier=0;
+  for(const preset of queries){
+    const tier=BQ_TIER[preset]||0;
+    if(tier!==lastTier){lines.push(`\n[Tier ${tier} — ${BQ_TIER_LABEL[tier]||''}]`);lastTier=tier;}
+    const row=(BQ_SHORT[preset]||preset).substring(0,qCol-1).padEnd(qCol)+dbs.map(db=>{
+      const cell=bestMap[db]?.[preset];
+      if(!cell)return'—'.padStart(COL);
+      const ms=_coldMode?(cell.times_ms&&cell.times_ms[0]!=null?cell.times_ms[0]:null):cell.min_ms;
+      if(ms!=null)return fmtMs(ms).padStart(COL);
+      return'—'.padStart(COL);
+    }).join('');
+    lines.push(row);
+  }
+  return lines.join('\n');
+}
+
+function _renderText(bestMap,dbs,queries){
+  document.getElementById('bres-text').textContent=_buildTextStr(bestMap,dbs,queries);
+  document.getElementById('bres').innerHTML='';
+}
+
+function _renderHistory(data){
+  const history=data.history||data.runs||[];
+  const scopedHistory=history.filter(r=>(r.scope||'full')===_rScope);
+  let h=`<h3 style="margin:20px 0 10px;font-size:13px;color:#8b949e">Run History (${_rScope} scope)</h3>`;
+  h+='<div style="display:flex;flex-direction:column;gap:6px">';
+  const sorted=[...scopedHistory].sort((a,b)=>b.started_at.localeCompare(a.started_at));
+  for(const run of sorted){
+    const ok=Object.values(run.queries||{}).filter(q=>!q.error).length;
+    const err=Object.values(run.queries||{}).filter(q=>q.error).length;
+    const ts=run.started_at.replace('T',' ').substring(0,16);
+    const col=DBC[run.database]||'#c9d1d9';
+    const sc=run.scope||'full';
+    const scCol=sc==='quarter'?'#d29922':'#6e7681';
+    h+=`<div style="background:#161b22;border:1px solid #30363d;border-radius:6px;padding:8px 14px;font-size:13px">`;
+    h+=`<div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:6px">`;
+    h+=`<span style="color:${col};font-weight:600">${run.database}</span>`;
+    h+=`<span style="color:#8b949e">${ts}</span>`;
+    h+=`<span style="color:#8b949e">&times;${run.n_runs} runs</span>`;
+    h+=`<span style="color:${scCol};font-size:11px">${sc}</span>`;
+    h+=`<span style="color:#56d364">${ok} ok</span>`;
+    if(err)h+=`<span style="color:#f85149">${err} error</span>`;
+    const runIdEscH=run.started_at.replace(/'/g,"\\'");
+    const dbEscH=run.database.replace(/'/g,"\\'");
+    h+=`<button class="btn btn-s" style="padding:2px 7px;font-size:11px;color:#f85149;margin-left:auto" onclick="deleteHistoryRun('${runIdEscH}','${dbEscH}')" title="Delete this run">&#x2715; delete</button>`;
+    h+=`</div>`;
+    // Per-query promote buttons (only for non-errored queries)
+    h+=`<div style="display:flex;flex-wrap:wrap;gap:4px">`;
+    for(const [preset,q] of Object.entries(run.queries||{})){
+      if(q.error||q.min_ms==null)continue;
+      const presetEsc=preset.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+      const runIdEsc=run.started_at.replace(/'/g,"\\'");
+      const shortLabel=BQ_SHORT[preset]||preset;
+      h+=`<button class="btn btn-s" style="padding:2px 7px;font-size:11px" onclick="promoteToBest(${run.n_runs},'${runIdEsc}','${presetEsc}')" title="Promote ${preset} to best">&#8593; ${shortLabel}: ${fmtMs(q.min_ms)}</button>`;
+    }
+    h+=`</div>`;
+    h+=`</div>`;
+  }
+  if(!sorted.length)h+=`<span style="color:#8b949e;font-size:13px">No ${_rScope} runs yet.</span>`;
+  h+='</div>';
+  const old=document.getElementById('_rhist');if(old)old.remove();
+  const wrap=document.createElement('div');wrap.id='_rhist';wrap.innerHTML=h;
+  const target=_rView==='table'?document.getElementById('bres'):(_rView==='chart'?document.getElementById('bres-chart'):document.getElementById('bres-text'));
+  target.after(wrap);
+}
+
+function sw(n){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.pnl').forEach(p=>p.classList.remove('active'));
+  document.querySelector(`.tab[onclick*="${n}"]`).classList.add('active');
+  document.getElementById(`pnl-${n}`).classList.add('active');
+  if(n==='logs')rl();if(n==='setup')cs();if(n==='bench')rlb();
+}
+
+async function cs(){
+  try{const r=await fetch('/api/status');const d=await r.json();
+  const bar=document.getElementById('sbar');
+  bar.innerHTML=DBN.map(db=>`<div class="chip"><div class="dot ${d[db]?'on':'off'}"></div>${db}</div>`).join('');
+  if(d._data){const info=document.getElementById('dataInfo');
+  info.innerHTML=`Seed file: ${d._data.seed?'<span style="color:#56d364">found</span>':'<span style="color:#f85149">not found</span>'} | Generated blocks: ${d._data.blocks}/48`;
+  }}catch(e){}
+}
+
+function initT(){
+  const opts=DBN.map(db=>`<option value="${db}">${db}</option>`).join('');
+  document.getElementById('bdb-sel').innerHTML=opts;
+}
+
+async function pollJob(url){
+  for(;;){
+    await new Promise(r=>setTimeout(r,1000));
+    const r=await fetch(url);
+    if(!r.ok){const t=await r.text();throw new Error('HTTP '+r.status+': '+t.substring(0,300));}
+    const d=await r.json();
+    if(d.status==='done')return d.result;
+    if(d.status==='error')throw new Error(d.error||'Query failed');
+  }
+}
+
+function normT(s){
+  // Normalize timestamp strings: "2020-01-01T12:00:00+00:00" -> "2020-01-01 12:00"
+  return String(s).replace('T',' ').replace('+00:00','').replace('.000000','').replace('.000','').substring(0,16).trim();
+}
+
+async function rl(){
+  try{const r=await fetch('/api/logs');const d=await r.json();
+  const v=document.getElementById('logv');v.textContent=d.logs||'No logs yet.';v.scrollTop=v.scrollHeight;
+  document.getElementById('lstat').innerHTML=d.running?'<span class="sp"></span> Running...':'Idle';}catch(e){}
+}
+
+async function rs(script,args){
+  try{await fetch('/api/run-script',{method:'POST',headers:{'Content-Type':'application/json'},
+  body:JSON.stringify({script,args:args||[]})});sw('logs');
+  const iv=setInterval(async()=>{await rl();const r=await fetch('/api/logs');const d=await r.json();
+  if(!d.running){clearInterval(iv);rl();}},2000);}catch(e){alert(e.message);}
+}
+
+async function ss(){try{await fetch('/api/stop-script',{method:'POST'});rl();}catch(e){}}
+
+cs();initT();setInterval(cs,30000);
+</script>
+
+
+</body></html>

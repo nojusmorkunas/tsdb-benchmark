@@ -1,0 +1,32 @@
+services:
+  influxdb3:
+    image: influxdb:3-enterprise
+    command: >
+      serve
+      --object-store file
+      --data-dir /var/lib/influxdb3
+      --cluster-id bench-cluster
+      --node-id bench-node
+      --without-auth
+      --license-email ${INFLUXDB3_LICENSE_EMAIL}
+      --max-http-request-size 104857600
+      --disable-parquet-mem-cache
+      --exec-mem-pool-bytes 8000000000
+    volumes:
+      - influx3_data:/var/lib/influxdb3
+    deploy:
+      resources:
+        limits:
+          memory: ${MEM_LIMIT:-20G}
+          cpus: '4'
+    networks:
+      - benchnet
+
+volumes:
+  influx3_data:
+    external: true
+    name: bench-influxdb3_influx3_data
+
+networks:
+  benchnet:
+    external: true

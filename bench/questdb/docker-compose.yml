@@ -1,0 +1,22 @@
+services:
+  questdb:
+    image: questdb/questdb:latest
+    volumes:
+      - qdb_data:/var/lib/questdb
+    deploy:
+      resources:
+        limits:
+          memory: ${MEM_LIMIT:-20G}
+          cpus: '4'
+    environment:
+      QDB_HTTP_ENABLED: "true"
+      QDB_QUERY_TIMEOUT_SEC: "7200"
+    networks:
+      - benchnet
+
+volumes:
+  qdb_data:
+
+networks:
+  benchnet:
+    external: true
